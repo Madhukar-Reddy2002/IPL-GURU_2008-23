@@ -18,9 +18,9 @@ df = load_data(data_path)
 
 # App title and navigation
 st.sidebar.title("🏏 IPL Guru")
-selected_page = st.sidebar.radio("Go to", ["Dashboard", "World Records"])
+selected_page = st.sidebar.radio("Go to", ["Year Wise", "All Time Records","Team Wise", "Player Wise"])
 
-if selected_page == "Dashboard":
+if selected_page == "Year Wise":
     st.title("🏏 IPL Guru - Your Ultimate Cricket Companion 🏆")
     selected_year = st.sidebar.selectbox("Select a Year", df['start_date'].dt.year.unique(), key="year_selection")
 
@@ -127,36 +127,28 @@ if selected_page == "Dashboard":
     top_scorers["non_boundaries"] = top_scorers["total_runs"] - top_scorers["fours"] * 4 - top_scorers["sixes"] * 6
     top_scorers["4_boundaries"] = top_scorers["fours"] * 4
     top_scorers["6_boundaries"] = top_scorers["sixes"] * 6
-    fig_top_scorers = px.bar(top_scorers, x='striker', y=['4_boundaries', '6_boundaries', 'non_boundaries'],
-                         title='Top 10 Players by Runs Scored',
-                         labels={'value': 'Total Runs', 'variable': 'Runs Type', 'striker': 'Player'},
-                         color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c'])
-    fig_top_scorers.update_layout(barmode='stack')
-    st.plotly_chart(fig_top_scorers, use_container_width=True)
 
-    temp_top_scorers = top_scorers.drop(['start_date', 'non_boundaries', '4_boundaries', '6_boundaries', 'Rank'], axis=1)
+    temp_top_scorers = top_scorers.drop(['start_date', 'non_boundaries', '4_boundaries', '6_boundaries', 'Rank', "num_wides", "num_no_balls"], axis=1)
     temp_top_scorers.set_index('striker', inplace=True)
-    st.subheader("🏏 Top Scorers with Strike Rate")
-    st.write(temp_top_scorers)
-
-    # Create a line chart for total runs per match
-    total_runs_per_match = filtered_data.groupby('start_date').total_runs.sum().reset_index()
-    fig_runs_per_match = px.line(total_runs_per_match, x='start_date', y='total_runs', title='Total Runs per Match',
-                                color_discrete_sequence=['blue'])
-    st.plotly_chart(fig_runs_per_match, use_container_width=True)
-
-    # Additional charts and insights
-    st.subheader("📊 Additional Insights")
-
     # Combined top scorers and stats
     top_scorers_stats = filtered_data.groupby([filtered_data['start_date'].dt.year, 'player_dismissed']).size().reset_index(name='num_times_out')
     combined_data = pd.merge(top_scorers, top_scorers_stats, left_on='striker', right_on='player_dismissed', how='left')
     combined_data['Batt. AVG'] = combined_data['total_runs'] / combined_data['num_times_out']
 
-    temp_combined = combined_data.drop(['start_date_x', 'start_date_y', 'player_dismissed', 'num_times_out', 'non_boundaries', '4_boundaries', '6_boundaries'], axis=1)
+    temp_combined = combined_data.drop(['start_date_x', 'start_date_y', 'player_dismissed', 'num_times_out', 'non_boundaries', '4_boundaries', '6_boundaries',"num_wides", "num_no_balls"], axis=1)
     temp_combined.set_index('Rank', inplace=True)  # Set 'Rank' column as index
-    st.subheader("🏏 Combined Top Scorers and Stats")
+    st.subheader("🏏 This Year Top Scorers and Stats")
     st.write(temp_combined)
+    #st.write(temp_top_scorers)
+
+    # Create a line chart for total runs per match
+    # Create a line chart for total runs per match by team
+    total_runs_per_match_by_team = filtered_data.groupby(['start_date', 'batting_team'])['total_runs'].sum().reset_index()
+    fig_runs_per_match = px.line(total_runs_per_match_by_team, x='start_date', y='total_runs', color='batting_team', title='Total Runs per Match by Team')
+    st.plotly_chart(fig_runs_per_match, use_container_width=True)
+
+    # Additional charts and insights
+    st.subheader("📊 Additional Insights")
 
     # Centuries with Bowling Team and Additional Metrics
     centuries = filtered_data.groupby([filtered_data['start_date'].dt.date, 'bowling_team', 'striker']).agg(
@@ -166,22 +158,36 @@ if selected_page == "Dashboard":
         sixes=('runs_off_bat', lambda x: (x == 6).sum()),
         num_wides=('wides', 'count'),
     ).reset_index()
-    centuries = centuries[centuries.total_runs > 100]
+    full_centuries = centuries[centuries.total_runs >= 100]
+    half_centuries = centuries[(centuries.total_runs >= 50) & (centuries.total_runs <= 99)]
+    if not full_centuries.empty:
+        full_centuries['balls_faced'] = centuries['balls_faced'] - centuries['num_wides']
+        full_centuries['strike_rate'] = (centuries['total_runs'] / centuries['balls_faced']) * 100
 
-    if not centuries.empty:
-        centuries['balls_faced'] = centuries['balls_faced'] - centuries['num_wides']
-        centuries['strike_rate'] = (centuries['total_runs'] / centuries['balls_faced']) * 100
-
-        centuries = centuries.sort_values(by='total_runs', ascending=False)
-        centuries['Rank'] = centuries['total_runs'].rank(ascending=False, method='min')
+        full_centuries = full_centuries.sort_values(by='total_runs', ascending=False)
+        full_centuries['Rank'] = full_centuries['total_runs'].rank(ascending=False, method='min')
         # Move the 'start_date' column to the second position
-        start_date_col = centuries.pop('start_date')
-        centuries.insert(1, 'start_date', start_date_col)
-        centuries.set_index('Rank', inplace=True)  # Set 'Rank' column as index
+        start_date_col = full_centuries.pop('start_date')
+        full_centuries.insert(1, 'start_date', start_date_col)
+        full_centuries.set_index('Rank', inplace=True)  # Set 'Rank' column as index
         st.subheader(f"👏 Centuries ({selected_year})")
-        st.write(centuries)
+        st.write(full_centuries)
     else:
         st.write('No players scored more than 100 runs in a single match.')
+    if not half_centuries.empty:
+        half_centuries['balls_faced'] = half_centuries['balls_faced'] - half_centuries['num_wides']
+        half_centuries['strike_rate'] = (half_centuries['total_runs'] / half_centuries['balls_faced']) * 100
+
+        half_centuries = half_centuries.sort_values(by='total_runs', ascending=False)
+        half_centuries['Rank'] = half_centuries['total_runs'].rank(ascending=False, method='min')
+        # Move the 'start_date' column to the second position
+        start_date_col = half_centuries.pop('start_date')
+        half_centuries.insert(1, 'start_date', start_date_col)
+        half_centuries.set_index('Rank', inplace=True)  # Set 'Rank' column as index
+        st.subheader(f"👏 Half -Centuries ({selected_year})")
+        st.write(half_centuries)
+    else:
+        st.write('No players scored more than 50 runs in a single match.')
 
     # Runs distribution
     runs_distribution = filtered_data.groupby('runs_off_bat').size().reset_index(name='count')
@@ -201,11 +207,11 @@ if selected_page == "Dashboard":
     st.plotly_chart(fig_bowlers, use_container_width=True)
 
     # Create a line chart for total wickets per match
-    total_wickets_per_match = filtered_data.groupby('start_date').wicket_type.count().reset_index(name='total_wickets')
-    fig_wickets_per_match = px.line(total_wickets_per_match, x='start_date', y='total_wickets', title='Total Wickets per Match',
-                                    color_discrete_sequence=['red'])
+    # Create a line chart for total wickets per match by team
+    total_wickets_per_match_by_team = filtered_data[(filtered_data['wicket_type'].notna()) & (filtered_data['wicket_type'] != "run out")].groupby(['start_date', 'bowling_team'])['wicket_type'].count().reset_index()
+    fig_wickets_per_match = px.line(total_wickets_per_match_by_team, x='start_date', y='wicket_type', color='bowling_team', title='Total Wickets per Match by Team')
     st.plotly_chart(fig_wickets_per_match, use_container_width=True)
-elif selected_page == "World Records":
+elif selected_page == "All Time Records":
     st.title("🌍 IPL World Records")
     st.sidebar.title("World Records")
     #st.subheader('🌍 All-Time Records')
@@ -236,37 +242,52 @@ elif selected_page == "World Records":
         bowler_wickets.columns = ['Bowling Team', 'Bowler', 'Wickets']
         max_wickets_bowler = bowler_wickets.loc[bowler_wickets['Wickets'].idxmax()]
         tournament_wickets = bowler_wickets['Wickets'].sum()
+
+        # Highest score in a single day by a team
+        team_scores = data.groupby(['start_date', 'batting_team'])['runs_off_bat'].sum().reset_index()
+        highest_team_score = team_scores.loc[team_scores['runs_off_bat'].idxmax()]
+
+        # Highest scoring team overall
+        team_total_runs = data.groupby('batting_team')['runs_off_bat'].sum().reset_index()
+        highest_scoring_team = team_total_runs.loc[team_total_runs['runs_off_bat'].idxmax()]
+
+        # Striker with highest number of sixes
+        striker_sixes = data.groupby('striker')['runs_off_bat'].apply(lambda x: (x == 6).sum()).reset_index()
+        striker_sixes.columns = ['Striker', 'Sixes']
+        max_sixes_striker = striker_sixes.loc[striker_sixes['Sixes'].idxmax()]
+        # Striker with highest strike rate
+        striker_strike_rates = data.groupby('striker').agg(
+            total_runs=('runs_off_bat', 'sum'),
+            balls_faced=('striker', 'count'),
+            num_wides=('wides', 'count'),
+            num_no_balls=('noballs', 'count')
+        ).reset_index()
+        striker_strike_rates['balls_faced'] = striker_strike_rates['balls_faced'] - striker_strike_rates['num_wides'] - striker_strike_rates['num_no_balls']
+        striker_strike_rates['strike_rate'] = (striker_strike_rates['total_runs'] / striker_strike_rates['balls_faced']) * 100
+        max_strike_rate_striker = striker_strike_rates.loc[striker_strike_rates['strike_rate'].idxmax()]
+
+        # Striker with highest batting average
+        striker_batting_avg = data.groupby(['striker', 'player_dismissed']).size().reset_index(name='num_times_out')
+        striker_batting_avg = pd.merge(striker_batting_avg, striker_strike_rates[['striker', 'total_runs']], on='striker', how='left')
+        striker_batting_avg['Batt. AVG'] = striker_batting_avg['total_runs'] / striker_batting_avg['num_times_out']
+        max_batting_avg_striker = striker_batting_avg.loc[striker_batting_avg['Batt. AVG'].idxmax()]
+
         st.subheader(f"🏆 {title} (All-Time)")
         col1, col2, col3 = st.columns(3)
         with col1:
+            st.metric("Number of Matches", num_matches)
             st.metric("Orange Cap Holder", max_runs_player['striker'], f"{max_runs_player['total_runs']} runs")
+            st.metric("Tournament Total Runs", tournament_total_runs)
+            st.metric("Highest Score in a Single Day by a Team", highest_team_score['batting_team'], f"{highest_team_score['runs_off_bat']} runs")
+            st.metric("Highest Scoring Team Overall", highest_scoring_team['batting_team'], f"{highest_scoring_team['runs_off_bat']} runs")
         with col2:
             st.metric("Highest Individual Score", max_score_player['striker'], f"{max_score_player['runs_off_bat']} runs")
+            st.metric("Tournament Fours", tournament_fours)
+            st.metric("Tournament Sixes", tournament_sixes)
+            st.metric("Striker with Highest Number of Sixes", max_sixes_striker['Striker'], f"{max_sixes_striker['Sixes']} sixes")
         with col3:
             st.metric("Purple Cap Holder", max_wickets_bowler['Bowler'], f"{max_wickets_bowler['Wickets']} wickets")
-        
-        centuries = data.groupby([data['start_date'].dt.date, 'bowling_team', 'striker']).agg(
-            total_runs=('runs_off_bat', 'sum'),
-            balls_faced=('striker', 'count'),
-            fours=('runs_off_bat', lambda x: (x == 4).sum()),
-            sixes=('runs_off_bat', lambda x: (x == 6).sum()),
-            num_wides=('wides', 'count'),).reset_index()
-        centuries = centuries[centuries.total_runs >= 100]
-        if not centuries.empty:
-            centuries['balls_faced'] = centuries['balls_faced'] - centuries['num_wides']
-            centuries['strike_rate'] = (centuries['total_runs'] / centuries['balls_faced']) * 100
-        centuries = centuries.sort_values(by='total_runs', ascending=False)
-        centuries['Rank'] = centuries['total_runs'].rank(ascending=False, method='min')
-        start_date_col = centuries.pop('start_date')
-        centuries.insert(1, 'start_date', start_date_col)
-        centuries.set_index('Rank', inplace=True)  # Set 'Rank' column as index
-        st.subheader(f"👏 Centuries (All-Time)")
-        st.write(centuries)
-
-        # Count the number of times each player appears in the centuries table
-        player_counts = centuries['striker'].value_counts().reset_index()
-        player_counts.columns = ['Player', 'Appearances']
-        st.subheader("Player Appearances in Centuries Table")
-        st.write(player_counts)
-    # Display key stats
-    display_key_stats(df1, "Key Stats")
+            st.metric("Tournament Total Wickets", tournament_wickets)
+            #st.metric("Striker with Highest Strike Rate", max_strike_rate_striker['striker'], f"{max_strike_rate_striker['strike_rate']:.2f}")
+            #st.metric("Striker with Highest Batting Average", max_batting_avg_striker['striker'], f"{max_batting_avg_striker['Batt. AVG']:.2f}")
+    display_key_stats(df1, "Key Points")
