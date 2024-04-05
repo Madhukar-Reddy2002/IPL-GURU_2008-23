@@ -17,7 +17,7 @@ data_path = './new.csv'
 df = load_data(data_path)
 
 # App title and navigation
-st.sidebar.title("🏏 IPL Guru")
+st.sidebar.title("🏏 IPL Guru By MS")
 selected_page = st.sidebar.radio("Go to", ["Year Wise", "All Time Records","Team Wise", "Player Wise"])
 
 if selected_page == "Year Wise":
