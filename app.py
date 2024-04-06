@@ -1,9 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import numpy as np
+import alltime
 
 # Set page configuration
-st.set_page_config(page_title="IPL Guru", page_icon=":cricket_bat:", layout="wide")
+#st.set_page_config(page_title="IPL Guru", page_icon=":cricket_bat:", layout="wide")
 
 # Load and preprocess data
 @st.cache_data
@@ -212,82 +214,10 @@ if selected_page == "Year Wise":
     fig_wickets_per_match = px.line(total_wickets_per_match_by_team, x='start_date', y='wicket_type', color='bowling_team', title='Total Wickets per Match by Team')
     st.plotly_chart(fig_wickets_per_match, use_container_width=True)
 elif selected_page == "All Time Records":
-    st.title("🌍 IPL World Records")
-    st.sidebar.title("World Records")
-    #st.subheader('🌍 All-Time Records')
-    # Include your code to display all-time records here
-    # For example:
-    st.write("Here you can display all-time records such as highest scores in a single match, highest career runs, etc.")
-    df1 = pd.read_csv(data_path, low_memory=False)
-    df1['start_date'] = pd.to_datetime(df1['date'], dayfirst=True)
-    #st.write(df1.head())
-    # Centuries with Bowling Team and Additional Metrics
-    # Filter data by selected year
-    def display_key_stats(data, title):
-        num_matches = len(data["match_id"].unique())
-        striker_runs = data.groupby(['batting_team', 'striker']).agg(
-            total_runs=('runs_off_bat', 'sum'),
-            fours=('runs_off_bat', lambda x: (x == 4).sum()),
-            sixes=('runs_off_bat', lambda x: (x == 6).sum()),
-            num_times_striker=('striker', 'count')
-        ).reset_index()
-        max_runs_player = striker_runs.loc[striker_runs['total_runs'].idxmax()]
-        tournament_total_runs = data['runs_off_bat'].sum()
-        tournament_fours = (data['runs_off_bat'] == 4).sum()
-        tournament_sixes = (data['runs_off_bat'] == 6).sum()
-        highest_score = data.groupby(['match_id', 'striker']).runs_off_bat.sum().reset_index()
-        max_score = highest_score.runs_off_bat.max()
-        max_score_player = highest_score[highest_score['runs_off_bat'] == max_score].iloc[0]
-        bowler_wickets = data[(data['wicket_type'].notna()) & (data['wicket_type'] != "run out")].groupby(['bowling_team', 'bowler'])['wicket_type'].count().reset_index()
-        bowler_wickets.columns = ['Bowling Team', 'Bowler', 'Wickets']
-        max_wickets_bowler = bowler_wickets.loc[bowler_wickets['Wickets'].idxmax()]
-        tournament_wickets = bowler_wickets['Wickets'].sum()
-
-        # Highest score in a single day by a team
-        team_scores = data.groupby(['start_date', 'batting_team'])['runs_off_bat'].sum().reset_index()
-        highest_team_score = team_scores.loc[team_scores['runs_off_bat'].idxmax()]
-
-        # Highest scoring team overall
-        team_total_runs = data.groupby('batting_team')['runs_off_bat'].sum().reset_index()
-        highest_scoring_team = team_total_runs.loc[team_total_runs['runs_off_bat'].idxmax()]
-
-        # Striker with highest number of sixes
-        striker_sixes = data.groupby('striker')['runs_off_bat'].apply(lambda x: (x == 6).sum()).reset_index()
-        striker_sixes.columns = ['Striker', 'Sixes']
-        max_sixes_striker = striker_sixes.loc[striker_sixes['Sixes'].idxmax()]
-        # Striker with highest strike rate
-        striker_strike_rates = data.groupby('striker').agg(
-            total_runs=('runs_off_bat', 'sum'),
-            balls_faced=('striker', 'count'),
-            num_wides=('wides', 'count'),
-            num_no_balls=('noballs', 'count')
-        ).reset_index()
-        striker_strike_rates['balls_faced'] = striker_strike_rates['balls_faced'] - striker_strike_rates['num_wides'] - striker_strike_rates['num_no_balls']
-        striker_strike_rates['strike_rate'] = (striker_strike_rates['total_runs'] / striker_strike_rates['balls_faced']) * 100
-        max_strike_rate_striker = striker_strike_rates.loc[striker_strike_rates['strike_rate'].idxmax()]
-
-        # Striker with highest batting average
-        striker_batting_avg = data.groupby(['striker', 'player_dismissed']).size().reset_index(name='num_times_out')
-        striker_batting_avg = pd.merge(striker_batting_avg, striker_strike_rates[['striker', 'total_runs']], on='striker', how='left')
-        striker_batting_avg['Batt. AVG'] = striker_batting_avg['total_runs'] / striker_batting_avg['num_times_out']
-        max_batting_avg_striker = striker_batting_avg.loc[striker_batting_avg['Batt. AVG'].idxmax()]
-
-        st.subheader(f"🏆 {title} (All-Time)")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Number of Matches", num_matches)
-            st.metric("Orange Cap Holder", max_runs_player['striker'], f"{max_runs_player['total_runs']} runs")
-            st.metric("Tournament Total Runs", tournament_total_runs)
-            st.metric("Highest Score in a Single Day by a Team", highest_team_score['batting_team'], f"{highest_team_score['runs_off_bat']} runs")
-            st.metric("Highest Scoring Team Overall", highest_scoring_team['batting_team'], f"{highest_scoring_team['runs_off_bat']} runs")
-        with col2:
-            st.metric("Highest Individual Score", max_score_player['striker'], f"{max_score_player['runs_off_bat']} runs")
-            st.metric("Tournament Fours", tournament_fours)
-            st.metric("Tournament Sixes", tournament_sixes)
-            st.metric("Striker with Highest Number of Sixes", max_sixes_striker['Striker'], f"{max_sixes_striker['Sixes']} sixes")
-        with col3:
-            st.metric("Purple Cap Holder", max_wickets_bowler['Bowler'], f"{max_wickets_bowler['Wickets']} wickets")
-            st.metric("Tournament Total Wickets", tournament_wickets)
-            #st.metric("Striker with Highest Strike Rate", max_strike_rate_striker['striker'], f"{max_strike_rate_striker['strike_rate']:.2f}")
-            #st.metric("Striker with Highest Batting Average", max_batting_avg_striker['striker'], f"{max_batting_avg_striker['Batt. AVG']:.2f}")
-    display_key_stats(df1, "Key Points")
+    alltime.display_all_time_records()
+elif selected_page == "Team Wise":
+    # Code for Team Wise page
+    pass
+elif selected_page == "Player Wise":
+    # Code for Player Wise page
+    pass
