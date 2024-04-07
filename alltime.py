@@ -49,6 +49,15 @@ def display_all_time_records():
         # Highest Individual Score
         highest_score = data.groupby(['match_id', 'striker'])['runs_off_bat'].sum().reset_index()
         max_score_player = highest_score.loc[highest_score['runs_off_bat'].idxmax()]
+        # Filter the highest_score DataFrame based on the condition
+        filtered_scores = highest_score[highest_score['runs_off_bat'] > 99]
+        striker_counts = filtered_scores['striker'].value_counts()
+        most_centuries_player = striker_counts.idxmax()
+
+        # Find the count of the maximum appearances
+        most_centuries_count = striker_counts.max()
+
+
 
         # Best Bowlers
         bowler_wickets = data[(data['wicket_type'].notna()) & (data['wicket_type'] != "run out")].groupby(['bowler'])['wicket_type'].count().reset_index()
@@ -60,35 +69,32 @@ def display_all_time_records():
         max_sixes_in_match = data.groupby(['match_id', 'striker']).agg({'runs_off_bat': lambda x: (x == 6).sum()}).reset_index()
         max_sixes_in_match_player = max_sixes_in_match.loc[max_sixes_in_match['runs_off_bat'].idxmax()]
 
-
         # Highest and Lowest Team Score in a Single Day
         team_scores = data.groupby(['start_date', 'batting_team', 'bowling_team'])[['runs_off_bat', 'extras']].sum().reset_index()
         highest_team_score = team_scores.loc[team_scores['runs_off_bat'].idxmax()]
         #lowest_team_score = team_scores.loc[team_scores['runs_off_bat'].idxmin()]
-
         st.subheader("🏆 Key Points (All-Time)")
 
         col1, col2, col3 = st.columns(3)
 
-        with col1:
-            st.metric("Number of Matches", num_matches)
-            st.metric("Orange Cap Holder", max_runs_player['striker'], f"{max_runs_player['total_runs']} runs in {max_runs_player['num_matches']} matches")
-            st.metric("Highest SR after 50 innings", f"{max_sr_player['total_runs'] / (max_sr_player['balls_faced'] - max_sr_player['wides_faced']) * 100:.2f}%", f"{max_sr_player['striker']}")
+        with col3:
+            #st.metric("Number of Matches", num_matches)
+            st.metric("Highest SR (atleast 50 innings)", f"{max_sr_player['striker']}",f"{max_sr_player['total_runs'] / (max_sr_player['balls_faced'] - max_sr_player['wides_faced']) * 100:.2f}%")
+            st.metric("Highest Batt AVG (atleast 50 innings)", max_batting_avg_player['striker'], f"{max_batting_avg_player['batting_avg']:.2f}")
             st.metric("Highest Team Score", highest_team_score['batting_team'], f"{highest_team_score['runs_off_bat'] + highest_team_score['extras']} runs (vs {highest_team_score['bowling_team']})")
             #st.metric("Lowest Team Score", lowest_team_score['batting_team'], f"{lowest_team_score['runs_off_bat'] + lowest_team_score['extras']} runs (vs {lowest_team_score['bowling_team']})")
 
         with col2:
-            st.metric("Highest Individual Score", max_score_player['striker'], f"{max_score_player['runs_off_bat']} runs")
-            st.metric("Tournament Fours", max_fours_player['striker'], f"{max_fours_player['fours']}")
-            st.metric("Tournament Sixes", max_sixes_player['striker'], f"{max_sixes_player['sixes']}")
+            st.metric("Highest no. of Fours", max_fours_player['striker'], f"{max_fours_player['fours']}")
+            st.metric("Highest no. of Sixes", max_sixes_player['striker'], f"{max_sixes_player['sixes']}")
             st.metric("Most Sixes in a Match", max_sixes_in_match_player['striker'], f"{max_sixes_in_match_player['runs_off_bat']}")
-            
 
-        with col3:
-            st.metric("Purple Cap Holder", max_wickets_bowler['Bowler'], f"{max_wickets_bowler['Wickets']} wickets")
-            st.metric("Tournament Total Wickets", tournament_wickets)
-            st.metric("Highest Batt AVG after 50 innings", f"{max_batting_avg_player['batting_avg']:.2f}", max_batting_avg_player['striker'])
+        with col1:
+            st.metric("Highest Number Runs", max_runs_player['striker'], f"{max_runs_player['total_runs']} runs in {max_runs_player['num_matches']} matches")
+            st.metric("Highest Individual Score", max_score_player['striker'], f"{max_score_player['runs_off_bat']} runs")
+            st.metric("Most Centuries ", most_centuries_player, f"{most_centuries_count}")
+            st.metric("most no. of Wickets By ", max_wickets_bowler['Bowler'], f"{max_wickets_bowler['Wickets']} wickets")
+            #st.metric("Tournament Total Wickets", tournament_wickets)
+            #st.metric("Most Centuries", most_centuries_player['striker'], f"{most_centuries_player['match_id']} centuries")
 
     display_key_stats(df)
-
-

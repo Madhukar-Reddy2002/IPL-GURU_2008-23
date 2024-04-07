@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import numpy as np
 import alltime
+import team
+import player
 
 # Set page configuration
 #st.set_page_config(page_title="IPL Guru", page_icon=":cricket_bat:", layout="wide")
@@ -12,7 +13,7 @@ import alltime
 def load_data(data_path):
     df = pd.read_csv(data_path, low_memory=False)
     df['start_date'] = pd.to_datetime(df['date'], dayfirst=True)
-    df['total_runs'] = df['runs_off_bat']
+    df['total_runs'] = df['runs_off_bat']+ df['wides']
     return df
 
 data_path = './new.csv'
@@ -216,8 +217,9 @@ if selected_page == "Year Wise":
 elif selected_page == "All Time Records":
     alltime.display_all_time_records()
 elif selected_page == "Team Wise":
-    # Code for Team Wise page
+    team.display(df)
     pass
 elif selected_page == "Player Wise":
+    player.display_player_dashboard(df)
     # Code for Player Wise page
     pass
