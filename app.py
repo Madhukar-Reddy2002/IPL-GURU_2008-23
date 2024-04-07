@@ -13,7 +13,7 @@ import player
 def load_data(data_path):
     df = pd.read_csv(data_path, low_memory=False)
     df['start_date'] = pd.to_datetime(df['date'], dayfirst=True)
-    df['total_runs'] = df['runs_off_bat']+ df['wides']
+    df['total_runs'] = df['runs_off_bat']
     return df
 
 data_path = './new.csv'
