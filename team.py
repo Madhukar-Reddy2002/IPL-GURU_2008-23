@@ -1,65 +1,62 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 def display(df):
     """Display the dashboard"""
+
     selected_team = st.sidebar.selectbox("Select a Team", df['batting_team'].unique(), key="team_selection")
+
     # Filter data by selected team
     filtered_data = df[(df['batting_team'] == selected_team) | (df['bowling_team'] == selected_team)].copy()
-    num_matches = len(filtered_data["match_id"].unique())
+
+    def get_opponent_team(row):
+        if row["team1"] == selected_team:
+            return row["team2"]
+        else:
+            return row["team1"]
+
+    filtered_data["opponent_team"] = df.apply(get_opponent_team, axis=1)
+
+    def get_results(row):
+        if row["winner"] == selected_team:
+            return "won"
+        elif row["winner"] == "Draw":
+            return "drawn"
+        else:
+            return "lost"
+
+    filtered_data["our_team_won"] = df.apply(get_results, axis=1)
+
+    num_matches = len(filtered_data["start_date"].unique())
+
     team_scores = filtered_data.groupby(['start_date', 'batting_team', 'bowling_team'])[['runs_off_bat', 'extras']].sum().reset_index()
     highest_team_score = team_scores.loc[team_scores['runs_off_bat'].idxmax()]
 
     st.metric("Highest Team Score", f"{highest_team_score['runs_off_bat'] + highest_team_score['extras']} runs", f" vs {highest_team_score['bowling_team']} on {highest_team_score['start_date']}")
     st.metric("Number of Matches", num_matches)
-    
-    # Group final match data by year
+
     final_match_by_year = df.groupby(df['start_date'].dt.year).first()
-    cups = (final_match_by_year["winner"] == selected_team).sum()
-    runners = (final_match_by_year["team2"] == selected_team).sum()
-    runners += (final_match_by_year["team1"] == selected_team).sum()
-    runners -= cups
+    cups_info = final_match_by_year[final_match_by_year["winner"] == selected_team][["start_date"]]
+    runnerup_years_info = final_match_by_year[(final_match_by_year["team1"] == selected_team) | (final_match_by_year["team2"] == selected_team)]
+    runnerup_years_info = runnerup_years_info[runnerup_years_info["winner"] != selected_team][["start_date"]]
+
+    cups = cups_info.shape[0]
+    runners = runnerup_years_info.shape[0]
+
     if cups > 0:
-        st.write('**Cups Won: {}**'.format(cups))
+        st.metric("Cups Won", cups)
+        years_won = ', '.join(map(str, list(cups_info["start_date"].dt.year)))
+        st.metric("Years Won", years_won)
+
     if runners > 0:
-        st.write('**Runners : {}**'.format(runners))
+        st.metric("Runners-up", runners)
+        years_runnerup = ', '.join(map(str, list(runnerup_years_info["start_date"].dt.year)))
+        st.metric("Years Runner-up", years_runnerup)
 
-    # Function to determine losers based on selected team
-    def determine_losers(row):
-        if row['team1'] == row['winner']:
-            return row['team2']
-        else:
-            return row['team1']
-
-    # Display table showing match ID, winner, and losers columns grouped by match ID
-    match_winner_table = df.groupby('match_id')[['winner', 'team1', 'team2']].first().reset_index()
-    match_winner_table['losers'] = match_winner_table.apply(determine_losers, axis=1)
-
-    # Divide the table based on whether the selected team is in the winners or losers column
-    winners_df = match_winner_table[match_winner_table['winner'] == selected_team]
-    losers_df = match_winner_table[match_winner_table['losers'] == selected_team]
-
-    # Count occurrences where winner is equal to selected team
-    winner_counts = winners_df.shape[0]
-    st.write(f"Winning Percentage: {(winner_counts/num_matches)*100:.2f} %")
-
-    # Counter for number of times each team occurs in the winning table
-    winning_teams_counter = winners_df.groupby('losers').size().reset_index(name='count')
-    losing_teams_counter = losers_df.groupby('winner').size().reset_index(name='count')
-
-    # Merge the two tables based on team names
-    merged_table = pd.merge(winning_teams_counter, losing_teams_counter, left_on='losers', right_on='winner', how='outer')
-    merged_table = merged_table.fillna(0)  # Fill NaN values with 0
-    merged_table['total_count'] = merged_table['count_x'] + merged_table['count_y']
-    merged_table = merged_table.rename(columns={'count_x': 'wins_as_loser', 'count_y': 'losses_as_winner', 'losers': 'opponent_team'})
-
-    # Calculate winning percentage against each team
-    merged_table['winning_percentage'] = (merged_table['wins_as_loser'] / (merged_table['wins_as_loser'] + merged_table['losses_as_winner'])) * 100
     team_scores = filtered_data.groupby(filtered_data['start_date'].dt.year)['runs_off_bat'].sum().reset_index()
     st.area_chart(team_scores.set_index('start_date'))
 
-    """Display the year-wise performance for the selected team"""
     batting_filtered_data = df[df['batting_team'] == selected_team].copy()
     batting_filtered_data['day_of_year'] = batting_filtered_data['start_date'].dt.dayofyear
 
@@ -70,21 +67,25 @@ def display(df):
     st.subheader(f"Yearly Highest Scores for {selected_team}")
     st.line_chart(max_scores_per_year.set_index('start_date'))
 
-    # Create separate pie charts for each opponent team
-    for index, row in merged_table.iterrows():
-        opponent_team = row['opponent_team']
-        total_matches = row['total_count']
-        wins = row['wins_as_loser']
-        losses = row['losses_as_winner']
+    match_winner_table = filtered_data.groupby('start_date')[['our_team_won', 'opponent_team']].first().reset_index()
 
-        # Create data for pie chart
-        labels = ['Wins', 'Losses']
-        sizes = [wins, losses]
-        colors = ['green', 'orange']
+    summary = match_winner_table.groupby('opponent_team').agg(
+        matches=('opponent_team', 'count'),
+        wins=('our_team_won', lambda x: (x == "won").sum()),
+        lost=('our_team_won', lambda x: (x == "lost").sum()),
+        drawn=('our_team_won', lambda x: (x == "drawn").sum()),
+    ).reset_index()
+    # Divide the table based on whether the selected team is in the winners or losers column
+    winners_count = match_winner_table[match_winner_table["our_team_won"] == "won"]
 
-        # Plot pie chart
-        fig, ax = plt.subplots(figsize=(3, 3))
-        ax.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-        ax.set_title(f'{selected_team} vs {opponent_team} ({total_matches} matches)')
-        st.pyplot(fig) 
+    # Count occurrences where winner is equal to selected team
+    winner_counts = len(winners_count)
+    st.write(f"Winning Percentage: {(winner_counts/num_matches)*100:.2f} %")
+    # Create a stacked bar chart using Plotly Express
+    fig = px.bar(summary, x='opponent_team', y=['wins', 'lost', 'drawn'],
+                 title=f"{selected_team} - Performance Against Each Opponent",
+                 labels={'value': 'Number of Matches', 'variable': 'Result'},
+                 barmode='stack')
+    fig.update_layout(xaxis_tickangle=-90)
+    st.plotly_chart(fig)
+# Display function call

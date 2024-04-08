@@ -16,7 +16,7 @@ def load_data(data_path):
     df['total_runs'] = df['runs_off_bat']
     return df
 
-data_path = './new.csv'
+data_path = './new2.csv'
 df = load_data(data_path)
 
 # App title and navigation

@@ -7,7 +7,7 @@ def display_all_time_records():
     st.sidebar.title("IPL Records")
 
     # Get data from the database
-    data_path = './new.csv'
+    data_path = './new2.csv'
     df = pd.read_csv(data_path)
     df['start_date'] = pd.to_datetime(df['date'], dayfirst=True)
 
