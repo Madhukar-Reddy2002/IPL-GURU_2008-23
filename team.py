@@ -87,7 +87,7 @@ def display(df):
                  labels={'value': 'Number of Matches', 'variable': 'Result'},
                  barmode='stack')
     fig.update_layout(xaxis_tickangle=-90)
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
     ###########################
     selected_opponent = st.selectbox("Select an Opponent", df['batting_team'].unique(), key="opponent_selection")
     filtered_data2 = filtered_data[filtered_data["opponent_team"] == selected_opponent]
@@ -107,7 +107,7 @@ def display(df):
                  labels={'value': 'Number of Matches', 'variable': 'Result'},
                  barmode='stack')
     fig.update_layout(xaxis_tickangle=-90)
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)
     # Divide the table based on whether the selected team is in the winners or losers column
     # winners_count = match_winner_table[match_winner_table["our_team_won"] == "won"]
 
