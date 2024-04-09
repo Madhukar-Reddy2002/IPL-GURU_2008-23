@@ -88,4 +88,36 @@ def display(df):
                  barmode='stack')
     fig.update_layout(xaxis_tickangle=-90)
     st.plotly_chart(fig)
+    ###########################
+    selected_opponent = st.selectbox("Select an Opponent", df['batting_team'].unique(), key="opponent_selection")
+    filtered_data2 = filtered_data[filtered_data["opponent_team"] == selected_opponent]
+    #st.write(filtered_data2)
+    match_winner_table2 = filtered_data2.groupby('start_date')[['our_team_won', 'city']].first().reset_index()
+    #st.write(match_winner_table2)
+
+    summary2 = match_winner_table2.groupby('city').agg(
+        matches=('start_date', 'count'),
+        wins=('our_team_won', lambda x: (x == "won").sum()),
+        lost=('our_team_won', lambda x: (x == "lost").sum()),
+        drawn=('our_team_won', lambda x: (x == "drawn").sum()),
+    ).reset_index()
+    #st.write(summary2)
+    fig = px.bar(summary2, x='city', y=['wins', 'lost', 'drawn'],
+                 title=f"{selected_team} - Performance in that City against  {selected_opponent}",
+                 labels={'value': 'Number of Matches', 'variable': 'Result'},
+                 barmode='stack')
+    fig.update_layout(xaxis_tickangle=-90)
+    st.plotly_chart(fig)
+    # Divide the table based on whether the selected team is in the winners or losers column
+    # winners_count = match_winner_table[match_winner_table["our_team_won"] == "won"]
+
+    # # Count occurrences where winner is equal to selected team
+    # winner_counts = len(winners_count)
+    # # Create the final pie chart
+    # fig = px.pie(names=['Wins', 'Losses', 'Draws'],
+    #              values=[win_counts, loss_counts, draw_counts],
+    #              title=f"{selected_team} - Performance Over Time",
+    #              labels={'value': 'Number of Matches', 'variable': 'Result'})
+    # fig.update_traces(textinfo='percent+value')
+    # st.plotly_chart(fig)
 # Display function call
